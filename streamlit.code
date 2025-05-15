@@ -1,0 +1,91 @@
+# pomegranate-disease-detector-
+
+import streamlit as st
+import numpy as np
+from PIL import Image
+from tensorflow.keras.models import load_model
+import os
+
+st.set_page_config(
+    page_title="Pomegranate Disease Detector",
+    page_icon="🍎",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+logo_path = "pomegranate_logo.jpg"
+
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, width=220)
+else:
+    st.sidebar.warning("⚠️ Logo image not found. Please check the file path.")
+
+st.sidebar.title("🍎 Pomegranate Disease Detection")
+st.sidebar.markdown("Upload a pomegranate fruit image to detect disease and get farming advice.")
+st.sidebar.markdown("---")
+
+model_path = "model.keras"
+
+if os.path.exists(model_path):
+    try:
+        model = load_model(model_path)
+        st.sidebar.success("✅ Model loaded successfully.")
+        st.sidebar.write(f"📐 Expected input shape: {model.input_shape}")
+    except Exception as e:
+        st.error(f"❌ Error loading model: {e}")
+        st.stop()
+else:
+    st.error(f"❌ Model file not found: {model_path}. Please ensure the file is accessible.")
+    st.stop()
+
+# Define class labels and farming advice
+label_dict = {
+    0: ("Healthy", "No action needed. Keep monitoring and maintain good crop hygiene."),
+    1: ("Anthracnose", "Use copper-based fungicides and avoid water splashes on fruits."),
+    2: ("Bacterial Blight", "Remove infected fruits and apply bactericides like Streptomycin."),
+    3: ("Alternaria Fruit Rot", "Apply appropriate fungicides and avoid over-irrigation."),
+    4: ("Cercospora Fruit Spot", "Use protective fungicides like mancozeb and maintain field hygiene.")
+}
+
+# Image preprocessing function
+def preprocess_image(image, target_size=(160, 160)):
+    image = image.convert("RGB")
+    image = image.resize(target_size)
+    image_array = np.array(image) / 255.0
+
+    return np.expand_dims(image_array, axis=0)
+
+st.title("🍎 Pomegranate Fruit Disease Classifier")
+st.write("Upload a clear image of a pomegranate fruit for disease prediction and farming recommendations.")
+
+# Image uploader
+uploaded_file = st.file_uploader("📷 Upload Fruit Image", type=["jpg", "jpeg", "png"])
+
+if uploaded_file:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
+
+    if st.button("🧪 Predict"):
+        processed_image = preprocess_image(image)
+
+        try:
+            prediction = model.predict(processed_image)
+            predicted_index = np.argmax(prediction)
+            confidence = np.max(prediction) * 100
+
+            st.write("📊 Raw prediction probabilities:", prediction[0])
+            st.write("🧠 Predicted class index:", predicted_index)
+
+            disease_name, advice = label_dict.get(predicted_index, ("Unknown", "No advice available."))
+
+            st.markdown(f"### ✅ Detected: **{disease_name}**")
+            st.markdown(f"**Confidence:** {confidence:.2f}%")
+            st.markdown(f"""
+<div style='background-color:#000000;padding:1rem;border-radius:10px;color:white'>
+    <b>🧾 Farming Advice:</b><br>{advice}
+</div>
+""", unsafe_allow_html=True)
+
+
+        except Exception as e:
+            st.error(f"❌ Error during prediction: {e}")
