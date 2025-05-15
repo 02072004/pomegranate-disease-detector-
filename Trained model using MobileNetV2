@@ -1,0 +1,120 @@
+Dataset Link : https://www.kaggle.com/datasets/sujaykapadnis/pomegranate-fruit-diseases-dataset
+TRAINED MODEL CODE 
+#Configuration environment
+import os
+
+1)
+os.environ['KAGGLE_USERNAME'] = "siddhuuunimbalkar" # username from the json file
+os.environ['KAGGLE_KEY'] = "bf5286726af9076d0a2c2ac2a6fb2543" # key from the json file
+
+#!kaggle datasets download -d paultimothymooney/chest-xray-pneumonia#!/bin/bash
+!kaggle datasets download sujaykapadnis/pomegranate-fruit-diseases-dataset
+
+!unzip pomegranate-fruit-diseases-dataset.zip
+
+2)
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import tensorflow as tf
+
+
+3)
+!pip install split-folders
+
+4)
+import splitfolders
+splitfolders.ratio('/content/Pomegranate Fruit Diseases Dataset for Deep Learning Models/Pomegranate Diseases Dataset/Pomegranate Diseases Dataset', seed=1337, ratio=(.8, .1,.1))
+
+5)
+import os
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+import matplotlib.pyplot as plt
+
+# Paths
+train_dir = "/content/output/train"
+val_dir = "/content/output/val"
+
+# Parameters
+IMG_SIZE = 160
+BATCH_SIZE = 32
+EPOCHS = 15
+NUM_CLASSES = 5
+
+# Data Augmentation
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=25,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.15,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+val_datagen = ImageDataGenerator(rescale=1./255)
+
+train_generator = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(IMG_SIZE, IMG_SIZE),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical'
+)
+
+val_generator = val_datagen.flow_from_directory(
+    val_dir,
+    target_size=(IMG_SIZE, IMG_SIZE),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical'
+)
+
+# Base Model
+base_model = MobileNetV2(input_shape=(IMG_SIZE, IMG_SIZE, 3),
+                         include_top=False,
+                         weights='imagenet')
+base_model.trainable = False
+
+# Head Model
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dropout(0.3)(x)
+predictions = Dense(NUM_CLASSES, activation='softmax')(x)
+
+model = Model(inputs=base_model.input, outputs=predictions)
+
+# Compile
+model.compile(optimizer=Adam(learning_rate=0.0001),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train
+history = model.fit(
+    train_generator,
+    epochs=EPOCHS,
+    validation_data=val_generator
+)
+
+# Fine-tune (optional)
+base_model.trainable = True
+model.compile(optimizer=Adam(learning_rate=0.00001),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+model.fit(train_generator, epochs=5, validation_data=val_generator)
+
+# Save
+model.save("model.keras")
+
+
+6)
+plt.plot(history.history['accuracy'], label='train acc')
+plt.plot(history.history['val_accuracy'], label='val acc')
+plt.legend()
+plt.title("Training vs Validation Accuracy")
+plt.show()
+
